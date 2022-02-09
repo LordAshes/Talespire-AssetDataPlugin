@@ -114,11 +114,13 @@ Where DatumChange has the following properties:
 Subscribe(MyCustomPlugin.Guid, Callback);
 
 Subscribe(MyCustomPlugin.Guid+".MyKey1", Callback);
+
 Subscribe(MyCustomPlugin.Guid+".MyKey2", Callback);
 
 Subscribe(MyCustomPlugin.Guid+".*", Callback);
 
 SetInfo("1234-56789-9001", MyCustomPlugin.Guid+".MyKey1", "Hello!");
+
 SetInfo("1234-56789-9001", MyCustomPlugin.Guid+".MyKey2", new List(){"A","B","C"} );
 
 SendInfo(MyCustomPlugin.Guid+".MyKey2", "Good bye!")
