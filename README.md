@@ -92,6 +92,14 @@ with the contents but the contents will not be stored. This method is used for r
 retained.
 
 
+```
+ReadInfo(*asset*, *key*);
+```
+
+This method reads the current value of the given key of the given asset returning a Datum which holds the previos and
+current value of the given key for the given asset.
+
+
 ## Callback Signature
 
 ``private void Callback(AssetDataPlugin.DatumChange change)``
