@@ -55,6 +55,7 @@ allows easy subscription to all the plugin's messages by subscribing to the plug
 Wildcards:
 
 ``*`` = Any number of characters including none.
+
 ``?`` = Any one character
 
 
