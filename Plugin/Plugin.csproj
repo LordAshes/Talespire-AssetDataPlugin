@@ -36,8 +36,15 @@
     <StartupObject />
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="0Harmony, Version=2.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\..\..\AppData\Roaming\r2modmanPlus-local\TaleSpire\profiles\Modded\BepInEx\core\0Harmony.dll</HintPath>
+    </Reference>
     <Reference Include="BepInEx">
       <HintPath>D:\moddingtalespire-2.3.0\bepinexbin\BepInEx\core\BepInEx.dll</HintPath>
+    </Reference>
+    <Reference Include="BepInEx.Harmony">
+      <HintPath>..\..\..\..\AppData\Roaming\r2modmanPlus-local\TaleSpire\profiles\Modded\BepInEx\core\BepInEx.Harmony.dll</HintPath>
     </Reference>
     <Reference Include="Bouncyrock.BouncePackage.Runtime">
       <HintPath>D:\Steam\steamapps\common\TaleSpire\TaleSpire_Data\Managed\Bouncyrock.BouncePackage.Runtime.dll</HintPath>
@@ -56,9 +63,6 @@
     </Reference>
     <Reference Include="Bouncyrock.TaleSpire.Runtime">
       <HintPath>D:\Steam\steamapps\common\TaleSpire\TaleSpire_Data\Managed\Bouncyrock.TaleSpire.Runtime.dll</HintPath>
-    </Reference>
-    <Reference Include="ChatServicePlugin">
-      <HintPath>..\..\..\..\AppData\Roaming\r2modmanPlus-local\TaleSpire\profiles\Modded\BepInEx\plugins\LordAshes-ChatService\ChatServicePlugin.dll</HintPath>
     </Reference>
     <Reference Include="Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <HintPath>..\packages\Newtonsoft.Json.13.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
@@ -104,6 +108,8 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Internal.cs" />
+    <Compile Include="Patches\Patches.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Utility.cs" />
     <Compile Include="Plugin.cs" />
@@ -113,6 +119,11 @@
     <None Include="App.config" />
     <None Include="packages.config" />
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <ProjectReference Include="..\SourceRole\SourceRole.csproj">
+      <Project>{08b45a92-bf19-40cb-9712-436e153d8fcf}</Project>
+      <Name>SourceRole</Name>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
