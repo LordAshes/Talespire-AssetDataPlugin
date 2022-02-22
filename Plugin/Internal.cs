@@ -222,7 +222,7 @@ namespace LordAshes
                             data[identity][key].previous = data[identity][key].value;
                             data[identity][key].value = value;
                         }
-                        System.IO.File.WriteAllText(pluginPath + "AssetDataPlugin." + CampaignSessionManager.Info.Description + "(" + CampaignSessionManager.Id.ToString() + ").json", JsonConvert.SerializeObject(data, Formatting.Indented));
+                        System.IO.File.WriteAllText(pluginPath + "AssetData/AssetDataPlugin." + CampaignSessionManager.Info.Description + "(" + CampaignSessionManager.Id.ToString() + ").json", JsonConvert.SerializeObject(data, Formatting.Indented));
                     }
                 }
                 catch (Exception x)
@@ -264,6 +264,7 @@ namespace LordAshes
                         message = message.Substring(("/" + AssetDataPlugin.Guid + " ").Length);
                         if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Message="+message); }
                         string[] parts = message.Split(dividor);
+                        // Source|Key|ChangeAction|Previous|Value
                         if (diagnostics >= DiagnosticSelection.low) { Debug.Log("Asset Data Plugin: ProcessRemoteChange: Remote notification of " + parts[1] + " on " + parts[0] + " (" + parts[2] + ") from " + parts[3] + " to " + parts[4]); }
                         ChangeAction action = ChangeAction.modify;
                         switch (parts[2].ToUpper())
@@ -358,40 +359,60 @@ namespace LordAshes
                 }
             }
 
-            public static void SendPackets(string identity, string key, string action, string value)
+            public static void SendPackets(string identity, string key, string action, string value, bool legacy = false)
             {
-                string msg = value;
-                if (msg.Length > 100)
+                if (!legacy)
                 {
-                    float packets = ((float)msg.Length / 100f);
-                    if (packets != Math.Floor(packets))
+                    string msg = value;
+                    if (msg.Length > 100)
                     {
-                        packets = (float)Math.Floor(packets) + 1f;
+                        float packets = ((float)msg.Length / 100f);
+                        if (packets != Math.Floor(packets))
+                        {
+                            packets = (float)Math.Floor(packets) + 1f;
+                        }
+                        System.Guid id = System.Guid.NewGuid();
+                        for (int i = 0; i < packets; i++)
+                        {
+                            if (i == 0)
+                            {
+                                if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Sending Initial Packet " + i + " of " + packets + ": " + msg.Substring(0, 100)); }
+                                messageDistributor.SendMessage("/" + AssetDataPlugin.Guid + ".Multi " + id.ToString() + ":" + i + ":" + packets + " " + identity.ToString() + dividor + key + dividor + action + dividor + dividor + msg.Substring(0, 100), LocalPlayer.Id.Value);
+                            }
+                            else if (msg.Length >= 100)
+                            {
+                                if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Sending Packet " + i + " of " + packets + ": " + msg.Substring(0, 100)); }
+                                messageDistributor.SendMessage("/" + AssetDataPlugin.Guid + ".Multi " + id.ToString() + ":" + i + ":" + packets + " " + msg.Substring(0, 100), LocalPlayer.Id.Value);
+                            }
+                            else
+                            {
+                                if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Sending End Packet " + i + " of " + packets + ": " + msg); }
+                                messageDistributor.SendMessage("/" + AssetDataPlugin.Guid + ".Multi " + id.ToString() + ":" + i + ":" + packets + " " + msg, LocalPlayer.Id.Value);
+                            }
+                            if (msg.Length >= 100) { msg = msg.Substring(100); } else { msg = ""; }
+                        }
                     }
-                    System.Guid id = System.Guid.NewGuid();
-                    for (int i = 0; i < packets; i++)
+                    else
                     {
-                        if (i == 0)
-                        {
-                            if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Sending Initial Packet " + i + " of " + packets + ": " + msg.Substring(0, 100)); }
-                            messageDistributor.SendMessage("/" + AssetDataPlugin.Guid + ".Multi " + id.ToString() + ":" + i + ":" + packets + " " + identity.ToString() + dividor + key + dividor + action + dividor + dividor + msg.Substring(0, 100), LocalPlayer.Id.Value);
-                        }
-                        else if (msg.Length >= 100)
-                        {
-                            if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Sending Packet " + i + " of " + packets + ": " + msg.Substring(0, 100)); }
-                            messageDistributor.SendMessage("/" + AssetDataPlugin.Guid + ".Multi " + id.ToString() + ":" + i + ":" + packets + " " + msg.Substring(0, 100), LocalPlayer.Id.Value);
-                        }
-                        else
-                        {
-                            if (diagnostics >= DiagnosticSelection.high){ Debug.Log("Sending End Packet " + i + " of " + packets + ": " + msg); }
-                            messageDistributor.SendMessage("/" + AssetDataPlugin.Guid + ".Multi " + id.ToString() + ":" + i + ":" + packets + " " + msg, LocalPlayer.Id.Value);
-                        }
-                        if (msg.Length >= 100) { msg = msg.Substring(100); } else { msg = ""; }
+                        messageDistributor.SendMessage("/" + AssetDataPlugin.Guid + " " + identity.ToString() + dividor + key + dividor + action + dividor + dividor + msg, LocalPlayer.Id.Value);
                     }
                 }
                 else
                 {
-                    messageDistributor.SendMessage("/" + AssetDataPlugin.Guid + " " + identity.ToString() + dividor + key + dividor + action + dividor + dividor + msg, LocalPlayer.Id.Value);
+                    if (action.ToUpper() != "REMOVE")
+                    {
+                        if (Legacy.setInfo != null)
+                        {
+                            Legacy.setInfo.Invoke(null, new object[] { new CreatureGuid(identity), key, value });
+                        }
+                    }
+                    else
+                    {
+                        if (Legacy.clearInfo != null)
+                        {
+                            Legacy.clearInfo.Invoke(null, new object[] { new CreatureGuid(identity), key });
+                        }
+                    }
                 }
             }
         }

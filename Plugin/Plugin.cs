@@ -3,6 +3,7 @@ using Bounce.Unmanaged;
 using HarmonyLib;
 using Newtonsoft.Json;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -16,11 +17,11 @@ namespace LordAshes
         // Plugin info
         public const string Name = "Asset Data Plug-In";
         public const string Guid = "org.lordashes.plugins.assetdata";
-        public const string Version = "1.1.0.0";
+        public const string Version = "1.2.0.0";
 
         void Awake()
         {
-            Debug.Log("Asset Data Plugin: Active.");
+            Debug.Log("Asset Data Plugin: "+this.GetType().AssemblyQualifiedName+" is actve.");
 
             Internal.diagnostics = Config.Bind("Settings", "Diagnostics", DiagnosticSelection.low).Value;
 
@@ -28,15 +29,17 @@ namespace LordAshes
 
             StartCoroutine("GetDistributor", new object[] { Config.Bind("Settings", "Plugins load time", 3f).Value });
 
+            if(!System.IO.Directory.Exists(Internal.pluginPath + "AssetData")) { System.IO.Directory.CreateDirectory(Internal.pluginPath + "AssetData/"); }
+
             CampaignSessionManager.OnCampaignChanged += () =>
             {
                 if (Internal.diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Campaign Changed"); }
-                if (System.IO.File.Exists(Internal.pluginPath + "AssetDataPlugin." + CampaignSessionManager.Info.Description + "(" + CampaignSessionManager.Id.ToString() + ").json"))
+                if (System.IO.File.Exists(Internal.pluginPath + "AssetData/AssetDataPlugin." + CampaignSessionManager.Info.Description + "(" + CampaignSessionManager.Id.ToString() + ").json"))
                 {
                     if (Internal.diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Previous Data Found. Loading AssetDataPlugin Data..."); }
                     lock (Internal.padlockData)
                     {
-                        Internal.data = JsonConvert.DeserializeObject<Dictionary<string, Dictionary<string, Datum>>>(System.IO.File.ReadAllText(Internal.pluginPath + "AssetDataPlugin." + CampaignSessionManager.Info.Description + "(" + CampaignSessionManager.Id.ToString() + ").json"));
+                        Internal.data = JsonConvert.DeserializeObject<Dictionary<string, Dictionary<string, Datum>>>(System.IO.File.ReadAllText(Internal.pluginPath + "AssetData/AssetDataPlugin." + CampaignSessionManager.Info.Description + "(" + CampaignSessionManager.Id.ToString() + ").json"));
                     }
                 }
 
@@ -60,27 +63,9 @@ namespace LordAshes
             var harmony = new Harmony(Guid);
             harmony.PatchAll();
 
-            Utility.PostOnMainPage(this.GetType());
-        }
+            StartCoroutine("CheckForLegacySupport");
 
-        void Update()
-        {
-            if(Input.GetKeyUp(KeyCode.Q))
-            {
-                Subscribe("LordAshes.*", (datum) => { Debug.Log("Callback: " + datum.key + "->" + datum.action+"->" + datum.source+"->"+ Convert.ToString(datum.previous) + "->" + Convert.ToString(datum.value)); });
-            }
-            if (Input.GetKeyUp(KeyCode.W))
-            {
-                SetInfo("Anonymous","LordAshes.MessagePipe", "Hello World!");
-            }
-            if (Input.GetKeyUp(KeyCode.E))
-            {
-                SendInfo("LordAshes.MessagePipe", "Bye Cruel World!");
-            }
-            if (Input.GetKeyUp(KeyCode.R))
-            {
-                Debug.Log("Content: "+ReadInfo("Anonymous","LordAshes.MessagePipe"));
-            }
+            Utility.PostOnMainPage(this.GetType());
         }
 
         /// <summary>
@@ -179,7 +164,7 @@ namespace LordAshes
         /// <param name="identity">Identification of the asset associated with the data</param>
         /// <param name="key">Identification of the key for which the value applies</param>
         /// <param name="value">The value of the given key for the given asset</param>
-        public static void SetInfo(string identity, string key, string value)
+        public static void SetInfo(string identity, string key, string value, bool legacy=false)
         {
             try
             {
@@ -188,11 +173,11 @@ namespace LordAshes
                 {
                     if (!Internal.data.ContainsKey(identity) || !Internal.data[identity].ContainsKey(key))
                     {
-                        Internal.SendPackets(identity, key, "add", value);
+                        Internal.SendPackets(identity, key, "add", value, legacy);
                     }
                     else
                     {
-                        Internal.SendPackets(identity, key, "modify", value);
+                        Internal.SendPackets(identity, key, "modify", value, legacy);
                     }
                     Internal.SetInfo(identity, key, value);
                 }
@@ -210,11 +195,11 @@ namespace LordAshes
         /// <param name="identity">Identification of the asset associated with the data</param>
         /// <param name="key">Identification of the key for which the value applies</param>
         /// <param name="value">The value of the given key for the given asset</param>
-        public static void SetInfo(string identity, string key, object value)
+        public static void SetInfo(string identity, string key, object value, bool legacy = false)
         {
             try
             {
-                SetInfo(identity, key, JsonConvert.SerializeObject(value));
+                SetInfo(identity, key, JsonConvert.SerializeObject(value), legacy);
             }
             catch (Exception x)
             {
@@ -264,12 +249,12 @@ namespace LordAshes
         /// </summary>
         /// <param name="identity">Identification of the asset associated with the data</param>
         /// <param name="key">Identification of the key to be cleared</param>
-        public static void ClearInfo(string identity, string key, string value)
+        public static void ClearInfo(string identity, string key, bool Legacy = false)
         {
             try
             {
                 if (Internal.diagnostics>=DiagnosticSelection.low) { Debug.Log("Asset Data Plugin: ClearInfo: Client Cleared " + key + " on " + identity); }
-                Internal.SendPackets(identity, key, "remove", null);
+                Internal.SendPackets(identity, key, "remove", null, Legacy);
                 Internal.ClearInfo(identity, key);
             }
             catch (Exception x)
@@ -351,6 +336,17 @@ namespace LordAshes
                 Debug.LogException(x);
                 return null;
             }
+        }
+
+        /// <summary>
+        /// Method of initiating legacy support if StatMessaging is available
+        /// </summary>
+        /// <returns></returns>
+        public IEnumerator CheckForLegacySupport()
+        {
+            yield return new WaitForSeconds(3.0f);
+            Debug.Log("Asset Data Plugin: Checking For Legacy Support");
+            Legacy.SubscribeToLegacyMessages();
         }
     }
 }
