@@ -19,6 +19,10 @@ This plugin, like all others, is free but if you want to donate, use: http://Lor
 ## Change Log
 
 ```
+1.2.0: Added Legacy Stat Messaging support if Stat Messaging is present. This allows Asset Data Plugin to get Stat Messaging
+       messages and provide them to client via the Asset Data Plugin interface. Legacy write is also possible.
+1.1.0: Added support for other message distribution systems besides ChatService such as RPC.
+1.1.0: Migrated to Campaign files for storage.
 1.0.0: Initial release
 ```
 
@@ -28,6 +32,10 @@ Use R2ModMan or similar installer to install this plugin.
 
 This is a dependency plugin and thus is not used directly by the user. It is used by other plugins to implement various
 communication and data storage features.
+
+Note: You need at least one message distribution plugin (e.g. ChatService plugin or RPC plugin) to make this plugin work.
+Currently the plugin will use the first plugin in the configured list that exists on the system. If you have multiple
+message distribution plugins, you can select the preferred plugin by re-ordering the list.
 
 ## Usage
 
@@ -55,9 +63,7 @@ allows easy subscription to all the plugin's messages by subscribing to the plug
 Wildcards:
 
 ``*`` = Any number of characters including none.
-
 ``?`` = Any one character
-
 
 
 ```
@@ -71,7 +77,6 @@ matches this key. This method stores the value under the give key for the given 
 will be available to new subscribers and or on board load.  
 
 To clear a key that is no loner needed, use the following code:
-
 
 ```
 ClearInfo(*asset*, *keyName*);
@@ -91,13 +96,20 @@ stored. Any subscribers that subscribed to the given key or whose ket patterns m
 with the contents but the contents will not be stored. This method is used for real-time messaging which is not to be
 retained.
 
-
 ```
-ReadInfo(*asset*, *key*);
+Reset(*subscriptionId*);
+```
+```
+Reset(*pattern*);
 ```
 
-This method reads the current value of the given key of the given asset returning a Datum which holds the previos and
-current value of the given key for the given asset.
+These methods perform a reset associated with the given subscription id (preferred method) or the key (or key pattern).
+A reset will cause all of the stored data to be re-evaluated and notifications re-sent for any data that matches the
+subscriptions. A subscription based reset will re-notify only notifications associated with the reset subscription.
+A patten based reset will re-notify about any data that matches the reset pattern. There is also a general reset which
+resets everything but this method should not be used and has been marked as obsolete because resetting all notifications
+can have adverse affects on other plugins who are not expected a notification update. For example, a plugin using a
+specific notification as a counter would advance its counter if another notification did a mass reset.
 
 
 ## Callback Signature
@@ -122,16 +134,27 @@ Where DatumChange has the following properties:
 Subscribe(MyCustomPlugin.Guid, Callback);
 
 Subscribe(MyCustomPlugin.Guid+".MyKey1", Callback);
-
 Subscribe(MyCustomPlugin.Guid+".MyKey2", Callback);
 
 Subscribe(MyCustomPlugin.Guid+".*", Callback);
 
 SetInfo("1234-56789-9001", MyCustomPlugin.Guid+".MyKey1", "Hello!");
-
 SetInfo("1234-56789-9001", MyCustomPlugin.Guid+".MyKey2", new List(){"A","B","C"} );
 
 SendInfo(MyCustomPlugin.Guid+".MyKey2", "Good bye!")
 
 ClearInfo("1234-56789-9001", MyCustomPlugin.Guid+".MyKey2");
 
+## Configuring Message Distribution Plugins
+
+The R2ModMan configruation for this plugin has a configuration which holds a list (one or more) of message distribution
+plugins. The plugins are named using the full qualified name (without the version and culture) and entries are separated
+by pipe characters (since commas are use in the qualified name). When this plugins starts up it will read through the
+list, in order, and check if the corresponding plugin is installed. If so, it will do a basic check to see that the plugin 
+had the correct methods and, if the test is passed, it will use that plugin for distributing content to other clients.
+
+This leads to two important conclusions:
+
+1. Additional message distribution plugins can easily be added by adding their fully qualified names into the list.
+2. The preference of which plugin to use (if multiple are installed) can be changed by re-ordering the list order.
+checked 
