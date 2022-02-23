@@ -245,8 +245,8 @@ namespace LordAshes
                         if (!data[_identity].ContainsKey(key)) { return; }
                         object lastValue = data[_identity][key];
                         data[_identity].Remove(key);
-                        ClearInfo(identity, key);
                     }
+                    System.IO.File.WriteAllText(pluginPath + "AssetData/AssetDataPlugin." + CampaignSessionManager.Info.Description + "(" + CampaignSessionManager.Id.ToString() + ").json", JsonConvert.SerializeObject(data, Formatting.Indented));
                 }
                 catch (Exception x)
                 {
@@ -344,7 +344,11 @@ namespace LordAshes
                             foreach (Subscription subscription in subscriptions)
                             {
                                 Wildcard match = new Wildcard(subscription.pattern, RegexOptions.IgnoreCase);
-                                if (match.IsMatch(key) && ((subscription.subscription == subscriptionId) || (subscriptionId == System.Guid.Empty)) && (subscription.pattern == pattern || pattern == null))
+                                bool isMatch = match.IsMatch(key);
+                                bool subscriptionRestrictionMatch = ((subscription.subscription == subscriptionId) || (subscriptionId == System.Guid.Empty));
+                                bool patternRestrictionMatch = (subscription.pattern == pattern || pattern == null);
+                                if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Subscription: "+subscription.pattern+", Key: "+key+", Match: "+ isMatch+", Subscription: " + subscriptionRestrictionMatch+", Pattern: "+patternRestrictionMatch); }
+                                if (isMatch && subscriptionRestrictionMatch && patternRestrictionMatch)
                                 {
                                     subscription.callback(new DatumChange() { action = action, source = identity, key = key, previous = previous, value = value });
                                 }
@@ -460,7 +464,13 @@ namespace LordAshes
             if (Internal.messageDistributor == null)
             {
                 Debug.LogError("Asset Data Plugin: No Usable Message Distributor Found");
-                Environment.Exit(1);
+                SystemMessage.AskForTextInput("Missing Choice Plugin",
+                                              "Please download RPC, Chat Service or similar plugin",
+                                              "Exit Talepsire", (s) =>  
+                                              {
+                                                  AppStateManager.ForceQuitNoUiNoSync();
+                                              }, null,
+                                              "Understood", null, "Running in Local Mode Only.");
             }
         }
     }

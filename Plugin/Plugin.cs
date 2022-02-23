@@ -17,13 +17,13 @@ namespace LordAshes
         // Plugin info
         public const string Name = "Asset Data Plug-In";
         public const string Guid = "org.lordashes.plugins.assetdata";
-        public const string Version = "1.2.0.0";
+        public const string Version = "1.2.2.0";
 
         void Awake()
         {
-            Debug.Log("Asset Data Plugin: "+this.GetType().AssemblyQualifiedName+" is actve.");
-
             Internal.diagnostics = Config.Bind("Settings", "Diagnostics", DiagnosticSelection.low).Value;
+
+            Debug.Log("Asset Data Plugin: "+this.GetType().AssemblyQualifiedName+" is actve. (Diagnostics = "+ Internal.diagnostics+")");
 
             Internal.cutoff = Config.Bind("Settings", "Number of days to data for unreferenced asset", 30).Value;
 
@@ -254,7 +254,7 @@ namespace LordAshes
             try
             {
                 if (Internal.diagnostics>=DiagnosticSelection.low) { Debug.Log("Asset Data Plugin: ClearInfo: Client Cleared " + key + " on " + identity); }
-                Internal.SendPackets(identity, key, "remove", null, Legacy);
+                Internal.SendPackets(identity, key, "remove", "", Legacy);
                 Internal.ClearInfo(identity, key);
             }
             catch (Exception x)
