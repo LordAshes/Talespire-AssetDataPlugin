@@ -20,6 +20,8 @@ namespace LordAshes
             public System.Guid subscription { get; set; } = System.Guid.Empty;
             public string pattern { get; set; } = "*";
             public Action<DatumChange> callback { get; set; } = null;
+            public string callbackType { get; set; } = null;
+            public string callbackMethod { get; set; } = null;
         }
 
         /// <summary>
@@ -259,13 +261,13 @@ namespace LordAshes
             {
                 try
                 {
+                    if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Remote message = " + message); }
                     if (message.StartsWith("/" + AssetDataPlugin.Guid + " "))
                     {
                         message = message.Substring(("/" + AssetDataPlugin.Guid + " ").Length);
-                        if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Message="+message); }
                         string[] parts = message.Split(dividor);
                         // Source|Key|ChangeAction|Previous|Value
-                        if (diagnostics >= DiagnosticSelection.low) { Debug.Log("Asset Data Plugin: ProcessRemoteChange: Remote notification of " + parts[1] + " on " + parts[0] + " (" + parts[2] + ") from " + parts[3] + " to " + parts[4]); }
+                        if (diagnostics >= DiagnosticSelection.low) { Debug.Log("Asset Data Plugin: Remote notification of " + parts[1] + " on " + parts[0] + " (" + parts[2] + ") from " + parts[3] + " to " + parts[4]); }
                         ChangeAction action = ChangeAction.modify;
                         switch (parts[2].ToUpper())
                         {
@@ -273,6 +275,7 @@ namespace LordAshes
                                 action = ChangeAction.add;
                                 if (!data.ContainsKey(parts[0].Trim()) || !data[parts[0].Trim()].ContainsKey(parts[1]) || data[parts[0].Trim()][parts[1]].value != parts[4])
                                 {
+                                    if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Remote Request Detected"); }
                                     if (parts[0].Trim().ToUpper() != "SYSTEM") { SetInfo(parts[0], parts[1], parts[4]); }
                                 }
                                 break;
@@ -280,6 +283,7 @@ namespace LordAshes
                                 action = ChangeAction.modify;
                                 if (!data.ContainsKey(parts[0].Trim()) || !data[parts[0].Trim()].ContainsKey(parts[1]) || data[parts[0].Trim()][parts[1]].value != parts[4])
                                 {
+                                    if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Remote Request Detected"); }
                                     if (parts[0].Trim().ToUpper() != "SYSTEM") { SetInfo(parts[0].Trim(), parts[1], parts[4]); }
                                 }
                                 break;
@@ -338,19 +342,45 @@ namespace LordAshes
                 {
                     if (key != "{Internal.Source.Timestamp}")
                     {
-                        if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: DatumUpdate: Sending Out Callbacks For " + key + " on " + identity + " changing from " + previous + " to " + value); }
+                        if (diagnostics >= DiagnosticSelection.low) { Debug.Log("Asset Data Plugin: Datum Changed: " + key + " on " + identity + " changing from " + previous + " to " + value); }
                         lock (padlockSubscriptions)
                         {
+                            if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Sending Out Subscription Callbacks"); }
                             foreach (Subscription subscription in subscriptions)
                             {
                                 Wildcard match = new Wildcard(subscription.pattern, RegexOptions.IgnoreCase);
                                 bool isMatch = match.IsMatch(key);
                                 bool subscriptionRestrictionMatch = ((subscription.subscription == subscriptionId) || (subscriptionId == System.Guid.Empty));
                                 bool patternRestrictionMatch = (subscription.pattern == pattern || pattern == null);
-                                if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Subscription: "+subscription.pattern+", Key: "+key+", Match: "+ isMatch+", Subscription: " + subscriptionRestrictionMatch+", Pattern: "+patternRestrictionMatch); }
+                                if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Subscription: "+subscription.pattern+", Key: "+key+", Match: "+ isMatch+" (Subscription Restriction: " + subscriptionRestrictionMatch+", Pattern Restriction: "+patternRestrictionMatch+")"); }
                                 if (isMatch && subscriptionRestrictionMatch && patternRestrictionMatch)
                                 {
-                                    subscription.callback(new DatumChange() { action = action, source = identity, key = key, previous = previous, value = value });
+                                    if (subscription.callback != null)
+                                    {
+                                        if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Sending Regular Callback"); }
+                                        subscription.callback(new DatumChange() { action = action, source = identity, key = key, previous = previous, value = value });
+                                    }
+                                    else if (subscription.callbackType != null && subscription.callbackMethod != null)
+                                    {
+                                        if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Sending Reflection Callback"); }
+                                        Type t = Type.GetType(subscription.callbackType);
+                                        if (t != null)
+                                        {
+                                            MethodInfo m = t.GetMethod(subscription.callbackMethod);
+                                            if (m != null)
+                                            {
+                                                m.Invoke(null, new object[] { action.ToString(), identity, key, previous, value });
+                                            }
+                                            else
+                                            {
+                                                Debug.LogWarning("Asset Data Plugin: Callback Method Is Not Found");
+                                            }
+                                        }
+                                        else
+                                        {
+                                            Debug.LogWarning("Asset Data Plugin: Callback Type Is Not Found");
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -380,17 +410,17 @@ namespace LordAshes
                         {
                             if (i == 0)
                             {
-                                if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Sending Initial Packet " + i + " of " + packets + ": " + msg.Substring(0, 100)); }
+                                if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Sending Change To Other Clients (Initial Packet " + (i+1) + " of " + packets + ": " + msg.Substring(0, 100)+")"); }
                                 messageDistributor.SendMessage("/" + AssetDataPlugin.Guid + ".Multi " + id.ToString() + ":" + i + ":" + packets + " " + identity.ToString() + dividor + key + dividor + action + dividor + dividor + msg.Substring(0, 100), LocalPlayer.Id.Value);
                             }
                             else if (msg.Length >= 100)
                             {
-                                if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Sending Packet " + i + " of " + packets + ": " + msg.Substring(0, 100)); }
+                                if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Sending Change To Other Clients (Packet " + (i+1) + " of " + packets + ": " + msg.Substring(0, 100)+")"); }
                                 messageDistributor.SendMessage("/" + AssetDataPlugin.Guid + ".Multi " + id.ToString() + ":" + i + ":" + packets + " " + msg.Substring(0, 100), LocalPlayer.Id.Value);
                             }
                             else
                             {
-                                if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Sending End Packet " + i + " of " + packets + ": " + msg); }
+                                if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Sending Change To Other Clients (End Packet " + (i+1) + " of " + packets + ": " + msg+")"); }
                                 messageDistributor.SendMessage("/" + AssetDataPlugin.Guid + ".Multi " + id.ToString() + ":" + i + ":" + packets + " " + msg, LocalPlayer.Id.Value);
                             }
                             if (msg.Length >= 100) { msg = msg.Substring(100); } else { msg = ""; }
@@ -398,6 +428,7 @@ namespace LordAshes
                     }
                     else
                     {
+                        if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Sending Change To Other Clients (Packet: " + msg +")"); }
                         messageDistributor.SendMessage("/" + AssetDataPlugin.Guid + " " + identity.ToString() + dividor + key + dividor + action + dividor + dividor + msg, LocalPlayer.Id.Value);
                     }
                 }
@@ -405,6 +436,7 @@ namespace LordAshes
                 {
                     if (action.ToUpper() != "REMOVE")
                     {
+                        if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Sending Legacy Set To Other Clients (Packet: " + identity+", "+key+", "+value+ ")"); }
                         if (Legacy.setInfo != null)
                         {
                             Legacy.setInfo.Invoke(null, new object[] { new CreatureGuid(identity), key, value });
@@ -412,6 +444,7 @@ namespace LordAshes
                     }
                     else
                     {
+                        if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Sending Legacy Clear To Other Clients (Packet: " + identity + ", " + key + ", " + value + ")"); }
                         if (Legacy.clearInfo != null)
                         {
                             Legacy.clearInfo.Invoke(null, new object[] { new CreatureGuid(identity), key });
@@ -454,6 +487,7 @@ namespace LordAshes
                     Internal.messageDistributor = new Distributor(type);
                     Internal.messageDistributor.AddHandler("/" + AssetDataPlugin.Guid, Internal.ProcessRemoteChange);
                     Internal.messageDistributor.AddHandler("/" + AssetDataPlugin.Guid + ".Multi", Internal.ProcessRemoteChange);
+                    Ready = true;
                     break;
                 }
                 catch (Exception ex)

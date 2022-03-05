@@ -17,7 +17,9 @@ namespace LordAshes
         // Plugin info
         public const string Name = "Asset Data Plug-In";
         public const string Guid = "org.lordashes.plugins.assetdata";
-        public const string Version = "1.2.2.0";
+        public const string Version = "1.2.4.0";
+
+        public static bool Ready = false;
 
         void Awake()
         {
@@ -68,6 +70,7 @@ namespace LordAshes
             Utility.PostOnMainPage(this.GetType());
         }
 
+
         /// <summary>
         /// Subscription for notification when the given key (or key pattern) changes for any asset
         /// </summary>
@@ -80,7 +83,25 @@ namespace LordAshes
             System.Guid identity = System.Guid.NewGuid();
             lock (Internal.padlockSubscriptions)
             {
-                Internal.subscriptions.Add(new Subscription() { subscription = identity, pattern = pattern, callback = callback });
+                Internal.subscriptions.Add(new Subscription() { subscription = identity, pattern = pattern, callback = callback, callbackType = null, callbackMethod = null });
+                Reset(identity);
+            }
+            return identity;
+        }
+
+        /// <summary>
+        /// Subscription for notification when the given key (or key pattern) changes for any asset
+        /// </summary>
+        /// <param name="pattern">The key or a wild card key for which notificatons are desired</param>
+        /// <param name="callback">The callback method that is triggered when a notification occurs</param>
+        /// <returns>Subscription id which can be used in other methods like unsubscribe</returns>
+        public static System.Guid SubscribeViaReflection(string pattern, string callbackType, string callbackMethod)
+        {
+            if (Internal.diagnostics >= DiagnosticSelection.low) { Debug.Log("Asset Data Plugin: Client Subscribed To " + pattern); }
+            System.Guid identity = System.Guid.NewGuid();
+            lock (Internal.padlockSubscriptions)
+            {
+                Internal.subscriptions.Add(new Subscription() { subscription = identity, pattern = pattern, callback = null, callbackType = callbackType, callbackMethod = callbackMethod });
                 Reset(identity);
             }
             return identity;
@@ -168,7 +189,7 @@ namespace LordAshes
         {
             try
             {
-                if (Internal.diagnostics>=DiagnosticSelection.low) { Debug.Log("Asset Data Plugin: SetInfo: Client Set " + key + " on " + identity + " to " + value); }
+                if (Internal.diagnostics>=DiagnosticSelection.low) { Debug.Log("Asset Data Plugin: SetInfo: Client Requested Set of " + key + " on " + identity + " to " + value); }
                 lock (Internal.padlockData)
                 {
                     if (!Internal.data.ContainsKey(identity) || !Internal.data[identity].ContainsKey(key))
@@ -253,7 +274,7 @@ namespace LordAshes
         {
             try
             {
-                if (Internal.diagnostics>=DiagnosticSelection.low) { Debug.Log("Asset Data Plugin: ClearInfo: Client Cleared " + key + " on " + identity); }
+                if (Internal.diagnostics>=DiagnosticSelection.low) { Debug.Log("Asset Data Plugin: ClearInfo: Client Requested Clear of " + key + " on " + identity); }
                 Internal.SendPackets(identity, key, "remove", "", Legacy);
                 Internal.ClearInfo(identity, key);
             }
