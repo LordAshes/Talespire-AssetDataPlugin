@@ -19,6 +19,11 @@ This plugin, like all others, is free but if you want to donate, use: http://Lor
 ## Change Log
 
 ```
+1.2.4: Minor bug fixes
+1.2.3: Improved debug messages to better track flow
+1.2.2: Added visual message if no message distribution plugins are found
+1.2.2: Bug fix for CleaInfo not clearing persistence file 
+1.2.1: Minor parameter type bug fix
 1.2.0: Added Legacy Stat Messaging support if Stat Messaging is present. This allows Asset Data Plugin to get Stat Messaging
        messages and provide them to client via the Asset Data Plugin interface. Legacy write is also possible.
 1.1.0: Added support for other message distribution systems besides ChatService such as RPC.
@@ -157,4 +162,21 @@ This leads to two important conclusions:
 
 1. Additional message distribution plugins can easily be added by adding their fully qualified names into the list.
 2. The preference of which plugin to use (if multiple are installed) can be changed by re-ordering the list order.
-checked 
+
+## Legacy Support
+
+When StatMessaging is present, Asset Data will make a single subscription to Stat Messaging for all messages and then
+treat any noitifications as if they were Asset Data notifications. This allows Asset Data to work with plugins that use
+Stat Messaging.
+
+For writing Legacy Stat Messaging messages, the SetInfo and ClearInfo methods have an optional Legacy boolean parameter
+which defaults to false. When set true, Asset Data will write the information out to Stat Messaging thus allowing Asset
+Data plugin to trigger plugins which use Stat Messaging.
+
+## Reflection Subscription
+
+An alternative subscription method was added providing a relfection friendly subscription method. This method does the
+same a the regular subscription method except the instead of passing in the callback function itself, the method takes
+the name of the callback (static) type and the name of the callback (static) method. This allows this method to be used
+with reflection when trying to implement soft dependency on Asset Data plugin.  
+
