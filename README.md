@@ -19,6 +19,8 @@ This plugin, like all others, is free but if you want to donate, use: http://Lor
 ## Change Log
 
 ```
+1.2.6: Better checking for missing message distributor and legacy support. Avoids exception when not available.
+1.2.5: Improved message distribution analysis
 1.2.4: Minor bug fixes
 1.2.3: Improved debug messages to better track flow
 1.2.2: Added visual message if no message distribution plugins are found
