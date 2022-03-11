@@ -17,7 +17,7 @@ namespace LordAshes
         // Plugin info
         public const string Name = "Asset Data Plug-In";
         public const string Guid = "org.lordashes.plugins.assetdata";
-        public const string Version = "1.2.4.0";
+        public const string Version = "1.2.6.0";
 
         public static bool Ready = false;
 

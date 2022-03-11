@@ -104,7 +104,7 @@ namespace LordAshes
                         case "added": action = ChangeAction.add; break;
                         case "removed": action = ChangeAction.remove; break;
                     }
-                    Internal.ProcessRemoteChange("/" + AssetDataPlugin.Guid + " " + change.cid+ "|" + change.key + "|" + action + "|" + change.previous + "|" + change.value, LocalPlayer.Id.ToString(), Talespire.SourceRole.anonymous);
+                    Internal.ProcessRemoteChange("/" + AssetDataPlugin.Guid + " " + change.cid + Internal.dividor + change.key + Internal.dividor + action + Internal.dividor + change.previous + Internal.dividor + change.value, LocalPlayer.Id.ToString(), Talespire.SourceRole.anonymous);
                 }
             }
         }

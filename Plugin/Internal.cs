@@ -109,7 +109,8 @@ namespace LordAshes
         {
             none = 0,
             low = 1,
-            high = 2
+            high = 2,
+            debug = 999
         }
 
         public static class Internal
@@ -127,7 +128,7 @@ namespace LordAshes
             public static Distributor messageDistributor = null;
 
             public static string pluginPath = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) + "/";
-            public const char dividor = '|';
+            public const char dividor = '^';
 
             public static void Reset()
             {
@@ -358,27 +359,45 @@ namespace LordAshes
                                     if (subscription.callback != null)
                                     {
                                         if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Sending Regular Callback"); }
-                                        subscription.callback(new DatumChange() { action = action, source = identity, key = key, previous = previous, value = value });
+                                        DatumChange datum = new DatumChange() { action = action, source = identity, key = key, previous = previous, value = value };
+                                        try
+                                        {
+                                            subscription.callback(datum);
+                                        }
+                                        catch(Exception x)
+                                        {
+                                            Debug.Log("Asset Data Plugin: Exception Sending Regular Callback");
+                                            Debug.Log(Convert.ToString(x));
+                                            Debug.LogException(x);
+                                        }
                                     }
                                     else if (subscription.callbackType != null && subscription.callbackMethod != null)
                                     {
                                         if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Sending Reflection Callback"); }
-                                        Type t = Type.GetType(subscription.callbackType);
-                                        if (t != null)
+                                        try
                                         {
-                                            MethodInfo m = t.GetMethod(subscription.callbackMethod);
-                                            if (m != null)
+                                            Type t = Type.GetType(subscription.callbackType);
+                                            if (t != null)
                                             {
-                                                m.Invoke(null, new object[] { action.ToString(), identity, key, previous, value });
+                                                MethodInfo m = t.GetMethod(subscription.callbackMethod);
+                                                if (m != null)
+                                                {
+                                                    m.Invoke(null, new object[] { action.ToString(), identity, key, previous, value });
+                                                }
+                                                else
+                                                {
+                                                    Debug.LogWarning("Asset Data Plugin: Callback Method Is Not Found");
+                                                }
                                             }
                                             else
                                             {
-                                                Debug.LogWarning("Asset Data Plugin: Callback Method Is Not Found");
+                                                Debug.LogWarning("Asset Data Plugin: Callback Type Is Not Found");
                                             }
                                         }
-                                        else
+                                        catch(Exception x)
                                         {
-                                            Debug.LogWarning("Asset Data Plugin: Callback Type Is Not Found");
+                                            Debug.Log("Asset Data Plugin: Exception Sending Reflection Callback");
+                                            Debug.LogException(x);
                                         }
                                     }
                                 }
@@ -395,8 +414,17 @@ namespace LordAshes
 
             public static void SendPackets(string identity, string key, string action, string value, bool legacy = false)
             {
+                if(diagnostics >= DiagnosticSelection.debug)
+                {
+                    Debug.Log("Asset Data Plugin: SendPackets: identity=" + identity);
+                    Debug.Log("Asset Data Plugin: SendPackets: key=" + key);
+                    Debug.Log("Asset Data Plugin: SendPackets: action=" + Convert.ToString(action));
+                    Debug.Log("Asset Data Plugin: SendPackets: value=" + value);
+                    Debug.Log("Asset Data Plugin: SendPackets: legacy=" + legacy);
+                }
                 if (!legacy)
                 {
+                    if (diagnostics >= DiagnosticSelection.debug) { Debug.Log("Asset Data Plugin: SendPackets: Asset Data Send Mode"); }
                     string msg = value;
                     if (msg.Length > 100)
                     {
@@ -428,26 +456,82 @@ namespace LordAshes
                     }
                     else
                     {
-                        if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Sending Change To Other Clients (Packet: " + msg +")"); }
-                        messageDistributor.SendMessage("/" + AssetDataPlugin.Guid + " " + identity.ToString() + dividor + key + dividor + action + dividor + dividor + msg, LocalPlayer.Id.Value);
+                        if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Sending Change To Other Clients (Packet: " + msg +")"); }
+                        if (messageDistributor != null)
+                        {
+                            try
+                            {
+                                messageDistributor.SendMessage("/" + AssetDataPlugin.Guid + " " + identity.ToString() + dividor + key + dividor + action + dividor + dividor + msg, LocalPlayer.Id.Value);
+                            }
+                            catch(Exception x)
+                            {
+                                Debug.LogWarning("Asset Data Plugin: Problem distributing the message via the message distributor");
+                                Debug.LogException(x);
+                            }
+                        }
+                        else
+                        {
+                            Debug.LogWarning("Asset Data Plugin: Message cannot be distributed to others becauase no message distribution plugin (e.g. RPC Plugin, Chat Service or similar plugin is present)");
+                        }
                     }
                 }
                 else
                 {
+                    if (diagnostics >= DiagnosticSelection.debug) { Debug.Log("Asset Data Plugin: SendPackets: Legacy Send Mode"); }
                     if (action.ToUpper() != "REMOVE")
                     {
-                        if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Sending Legacy Set To Other Clients (Packet: " + identity+", "+key+", "+value+ ")"); }
+                        if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Sending Legacy Set To Other Clients (Packet: " + identity+", "+key+", "+value+ ")"); }
                         if (Legacy.setInfo != null)
                         {
-                            Legacy.setInfo.Invoke(null, new object[] { new CreatureGuid(identity), key, value });
+                            if (diagnostics >= DiagnosticSelection.debug) { Debug.LogWarning("Asset Data Plugin: SendPackets: Legacy Set Info."); }
+                            try
+                            {
+                                if (Legacy.setInfo != null)
+                                {
+                                    Legacy.setInfo.Invoke(null, new object[] { new CreatureGuid(identity), key, value });
+                                }
+                                else
+                                {
+                                    Debug.LogWarning("Asset Data Plugin: Legacy suppot is not available. Ensure Stat Messaging Plugin is installed.");
+                                }
+                            }
+                            catch(Exception x)
+                            {
+                                Debug.LogWarning("Asset Data Plugin: Problem using Legacy SetInfo");
+                                Debug.LogException(x);
+                            }
+                        }
+                        else
+                        {
+                            if (diagnostics >= DiagnosticSelection.debug) { Debug.LogWarning("Asset Data Plugin: SendPackets: Legacy Mode Not Available. Ensure Stat Messaging Is Downlownloaded."); }
                         }
                     }
                     else
                     {
-                        if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Sending Legacy Clear To Other Clients (Packet: " + identity + ", " + key + ", " + value + ")"); }
+                        if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Sending Legacy Clear To Other Clients (Packet: " + identity + ", " + key + ", " + value + ")"); }
                         if (Legacy.clearInfo != null)
                         {
-                            Legacy.clearInfo.Invoke(null, new object[] { new CreatureGuid(identity), key });
+                            if (diagnostics >= DiagnosticSelection.debug) { Debug.LogWarning("Asset Data Plugin: SendPackets: Legacy Clear Info."); }
+                            try
+                            {
+                                if (Legacy.setInfo != null)
+                                {
+                                    Legacy.clearInfo.Invoke(null, new object[] { new CreatureGuid(identity), key });
+                                }
+                                else
+                                {
+                                    Debug.LogWarning("Asset Data Plugin: Legacy suppot is not available. Ensure Stat Messaging Plugin is installed.");
+                                }
+                            }
+                            catch(Exception x)
+                            {
+                                Debug.LogWarning("Asset Data Plugin: Problem using Legacy ClearInfo");
+                                Debug.LogException(x);
+                            }
+                        }
+                        else
+                        {
+                            if (diagnostics >= DiagnosticSelection.debug) { Debug.LogWarning("Asset Data Plugin: SendPackets: Legacy Mode Not Available. Ensure Stat Messaging Is Downlownloaded."); }
                         }
                     }
                 }
@@ -460,39 +544,53 @@ namespace LordAshes
             if (Internal.diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Looking For Message Distributor"); }
             string distributors = Config.Bind("Settings", "Client Distribution Plugins In Order Of preference",
                 "RPCPlugin.RPC.RPCManager, RPCPlugin"
-              + "|"
+              + Internal.dividor
               + "LordAshes.ChatServicePlugin+ChatMessageService, ChatServicePlugin"
             ).Value;
 
             if(Internal.diagnostics >= DiagnosticSelection.high) Debug.Log("Asset Data Plugin: Looking For Message Distributor From " + distributors);
 
-            foreach (string distributor in distributors.Split('|'))
+            foreach (string distributor in distributors.Split(Internal.dividor))
             {
                 try
                 {
                     if (Internal.diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Testing Message Distributor " + distributor); }
                     Type type = null;
-                    try
-                    {
-                        type = Type.GetType(distributor);
-                    }
-                    catch(Exception)
-                    {
-                        throw new Exception("Unable To Get A Reference To " + distributor + " Type"); 
-                    }
-                    if (type.GetMethod("AddHandler") == null) { throw new Exception("Missing AddHandler Method"); }
-                    if (type.GetMethod("RemoveHandler") == null) { throw new Exception("Missing AddHandler Method"); }
-                    if (type.GetMethod("SendMessage") == null) { throw new Exception("Missing AddHandler Method"); }
-                    if (Internal.diagnostics >= DiagnosticSelection.low) { Debug.Log("Asset Data Plugin: Using Message Distributor " + distributor); }
+                    try { type = Type.GetType(distributor); if (type == null) { throw new Exception("Unable To Get A Reference To " + distributor + " Type (Result Null)"); } } catch(Exception) { throw new Exception("Unable To Get A Reference To " + distributor + " Type (Result Exception)");  }
+                    if (Internal.diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Obtained Reference To " + distributor + " Type"); }
+                    try { if (type.GetMethod("AddHandler") == null) { throw new Exception("Missing AddHandler Method (Result Null)"); } } catch (Exception) { throw new Exception("Missing AddHandler Method (Result Exception)"); }
+                    if (Internal.diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: AddHandler Method Present"); }
+                    try { if (type.GetMethod("RemoveHandler") == null) { throw new Exception("Missing RemoveHandler Method (Result Null)"); } } catch (Exception) { throw new Exception("Missing RemoveHandler Method (Result Exception)"); }
+                    if (Internal.diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: RemoveHandler Method Present"); }
+                    try { if (type.GetMethod("SendMessage") == null) { throw new Exception("Missing SendMessage Method (Result Null)"); } } catch (Exception) { throw new Exception("Missing SendMessage Method (Result Exception)"); }
+                    if (Internal.diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: SendMessage Method Present"); }
                     Internal.messageDistributor = new Distributor(type);
+                    if (Internal.diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Making Distributor Subscriptions"); }
                     Internal.messageDistributor.AddHandler("/" + AssetDataPlugin.Guid, Internal.ProcessRemoteChange);
                     Internal.messageDistributor.AddHandler("/" + AssetDataPlugin.Guid + ".Multi", Internal.ProcessRemoteChange);
+                    if (Internal.diagnostics >= DiagnosticSelection.low) { Debug.Log("Asset Data Plugin: Using Message Distributor " + distributor); }
                     Ready = true;
                     break;
                 }
                 catch (Exception ex)
                 {
-                    if (Internal.diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Distributor '" + distributor + "' rejected because " + ex.Message); }
+                    if (Internal.diagnostics >= DiagnosticSelection.high)
+                    {
+                        Debug.Log("Asset Data Plugin: Distributor '" + distributor + "' rejected because " + ex.Message);
+                        try
+                        {
+                            Type type = Type.GetType(distributor);
+                            if (type != null)
+                            {
+                                MethodInfo[] methods = type.GetMethods();
+                                foreach (MethodInfo method in methods)
+                                {
+                                    Debug.LogWarning("Asset Data Plugin: Distributor '" + distributor + "' has method '" + method.Name + "'");
+                                }
+                            }
+                        }
+                        catch (Exception) {; }
+                    }
                 }
             }
             if (Internal.messageDistributor == null)
