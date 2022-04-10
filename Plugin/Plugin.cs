@@ -1,4 +1,5 @@
 ﻿using BepInEx;
+using BepInEx.Configuration;
 using Bounce.Unmanaged;
 using HarmonyLib;
 using Newtonsoft.Json;
@@ -17,7 +18,7 @@ namespace LordAshes
         // Plugin info
         public const string Name = "Asset Data Plug-In";
         public const string Guid = "org.lordashes.plugins.assetdata";
-        public const string Version = "1.2.6.0";
+        public const string Version = "1.3.0.0";
 
         public static bool Ready = false;
 
@@ -28,6 +29,10 @@ namespace LordAshes
             Debug.Log("Asset Data Plugin: "+this.GetType().AssemblyQualifiedName+" is actve. (Diagnostics = "+ Internal.diagnostics+")");
 
             Internal.cutoff = Config.Bind("Settings", "Number of days to data for unreferenced asset", 30).Value;
+
+            Internal.triggerDiagnosticToggle = Config.Bind("Settings", "Toggle Screen Diagnostics", new KeyboardShortcut(KeyCode.D, KeyCode.RightControl)).Value;
+            Internal.triggerSpecificDiagnostic = Config.Bind("Settings", "Show Diagnostics For Asset By Name", new KeyboardShortcut(KeyCode.F, KeyCode.RightControl)).Value;
+            Internal.triggerDiagnosticDump = Config.Bind("Settings", "Dump Complete Asset Data", new KeyboardShortcut(KeyCode.G, KeyCode.RightControl)).Value;
 
             StartCoroutine("GetDistributor", new object[] { Config.Bind("Settings", "Plugins load time", 3f).Value });
 
@@ -59,8 +64,24 @@ namespace LordAshes
                     }
                 }
 
+                if (!Internal.data.ContainsKey(AssetDataPlugin.Guid))
+                {
+                    SetInfo(AssetDataPlugin.Guid, "ScreenDiagnostics", false.ToString());
+                    SetInfo(AssetDataPlugin.Guid, "DiagnosticsOverrideAssetName", "");
+                }
+                if (!Internal.data[AssetDataPlugin.Guid].ContainsKey("ScreenDiagnostics")) { SetInfo(AssetDataPlugin.Guid, "ScreenDiagnostics", false.ToString()); }
+                if (!Internal.data[AssetDataPlugin.Guid].ContainsKey("DiagnosticsOverrideAssetName")) { SetInfo(AssetDataPlugin.Guid, "DiagnosticsOverrideAssetName", ""); }
+
                 Internal.Reset();
             };
+
+            if (!Internal.data.ContainsKey(AssetDataPlugin.Guid))
+            {
+                SetInfo(AssetDataPlugin.Guid, "ScreenDiagnostics", false.ToString());
+                SetInfo(AssetDataPlugin.Guid, "DiagnosticsOverrideAssetName", "");
+            }
+            if (!Internal.data[AssetDataPlugin.Guid].ContainsKey("ScreenDiagnostics")) { SetInfo(AssetDataPlugin.Guid, "ScreenDiagnostics", false.ToString()); }
+            if (!Internal.data[AssetDataPlugin.Guid].ContainsKey("DiagnosticsOverrideAssetName")) { SetInfo(AssetDataPlugin.Guid, "DiagnosticsOverrideAssetName", ""); }
 
             var harmony = new Harmony(Guid);
             harmony.PatchAll();
@@ -68,6 +89,58 @@ namespace LordAshes
             StartCoroutine("CheckForLegacySupport");
 
             Utility.PostOnMainPage(this.GetType());
+        }
+
+        void Update()
+        {
+            if(Utility.StrictKeyCheck(Internal.triggerDiagnosticToggle))
+            {
+                SetInfo(AssetDataPlugin.Guid, "ScreenDiagnostics", (!bool.Parse(Internal.data[AssetDataPlugin.Guid]["ScreenDiagnostics"].value)).ToString());
+            }
+            else if (Utility.StrictKeyCheck(Internal.triggerSpecificDiagnostic))
+            {
+                SystemMessage.AskForTextInput("Diagnostics For Asset...", "Enter Asset Identification:",
+                                              "Apply", (name) => { SetInfo(AssetDataPlugin.Guid, "DiagnosticsOverrideAssetName", name); SetInfo(AssetDataPlugin.Guid, "ScreenDiagnostics", true.ToString()); }, null,
+                                              "Clear", () => { SetInfo(AssetDataPlugin.Guid, "DiagnosticsOverrideAssetName", ""); }, "");
+            }
+            else if (Utility.StrictKeyCheck(Internal.triggerDiagnosticDump))
+            {
+                Debug.Log("Asset Data Plugin:\r\n" + JsonConvert.SerializeObject(Internal.data));
+            }
+        }
+
+        void OnGUI()
+        {
+            try
+            {
+                if (bool.Parse(Internal.data[AssetDataPlugin.Guid]["ScreenDiagnostics"].value))
+                {
+                    string id = Internal.data[AssetDataPlugin.Guid]["DiagnosticsOverrideAssetName"].value;
+                    if (id == "")
+                    {
+                        CreatureBoardAsset asset = null;
+                        CreaturePresenter.TryGetAsset(LocalClient.SelectedCreatureId, out asset);
+                        if (asset != null)
+                        {
+                            id = asset.Creature.CreatureId.ToString();
+                        }
+                    }
+                    if (id != "")
+                    {
+                        string content = "{}";
+                        if (Internal.data.ContainsKey(id)) { content = JsonConvert.SerializeObject(Internal.data[id]); }
+                        GUI.Label(new Rect(10, 40, Screen.width - 10, Screen.height - 40), "[" + id + "]: " + content);
+                    }
+                    else
+                    {
+                        GUI.Label(new Rect(10, 40, Screen.width - 10, Screen.height - 40), "[No Asset Selected]");
+                    }
+                }
+            }
+            catch(Exception x)
+            {
+                Debug.Log("Asset Data Plugin: GUI Exception: " + x);
+            }
         }
 
 

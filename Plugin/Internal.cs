@@ -1,4 +1,5 @@
 ﻿using BepInEx;
+using BepInEx.Configuration;
 using Bounce.Unmanaged;
 using Newtonsoft.Json;
 using System;
@@ -129,6 +130,10 @@ namespace LordAshes
 
             public static string pluginPath = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) + "/";
             public const char dividor = '^';
+
+            public static KeyboardShortcut triggerDiagnosticToggle;
+            public static KeyboardShortcut triggerSpecificDiagnostic;
+            public static KeyboardShortcut triggerDiagnosticDump;
 
             public static void Reset()
             {
@@ -270,13 +275,40 @@ namespace LordAshes
                         // Source|Key|ChangeAction|Previous|Value
                         if (diagnostics >= DiagnosticSelection.low) { Debug.Log("Asset Data Plugin: Remote notification of " + parts[1] + " on " + parts[0] + " (" + parts[2] + ") from " + parts[3] + " to " + parts[4]); }
                         ChangeAction action = ChangeAction.modify;
+                        if (diagnostics >= DiagnosticSelection.high) 
+                        {
+                            if (data.ContainsKey(parts[0].Trim()))
+                            {
+                                Debug.Log("Asset Data Plugin: Identity Exists: Yes");
+                                if (data[parts[0].Trim()].ContainsKey(parts[1]))
+                                {
+                                    Debug.Log("Asset Data Plugin: Key Exists: Yes");
+                                    if(data[parts[0].Trim()][parts[1]].value != parts[4])
+                                    {
+                                        Debug.Log("Asset Data Plugin: Change: "+ data[parts[0].Trim()][parts[1]].value+" vs "+parts[4]+": Yes");
+                                    }
+                                    else
+                                    {
+                                        Debug.Log("Asset Data Plugin: Change: " + data[parts[0].Trim()][parts[1]].value + " vs " + parts[4] + ": No");
+                                    }
+                                }
+                                else
+                                {
+                                    Debug.Log("Asset Data Plugin: Key Exists: No");
+                                }
+                            }
+                            else
+                            {
+                                Debug.Log("Asset Data Plugin: Identity Exists: No");
+                            }
+                        }
                         switch (parts[2].ToUpper())
                         {
                             case "ADD":
                                 action = ChangeAction.add;
                                 if (!data.ContainsKey(parts[0].Trim()) || !data[parts[0].Trim()].ContainsKey(parts[1]) || data[parts[0].Trim()][parts[1]].value != parts[4])
                                 {
-                                    if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Remote Request Detected"); }
+                                    if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Remote Add Request Detected"); }
                                     if (parts[0].Trim().ToUpper() != "SYSTEM") { SetInfo(parts[0], parts[1], parts[4]); }
                                 }
                                 break;
@@ -284,7 +316,7 @@ namespace LordAshes
                                 action = ChangeAction.modify;
                                 if (!data.ContainsKey(parts[0].Trim()) || !data[parts[0].Trim()].ContainsKey(parts[1]) || data[parts[0].Trim()][parts[1]].value != parts[4])
                                 {
-                                    if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Remote Request Detected"); }
+                                    if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Remote Modify Request Detected"); }
                                     if (parts[0].Trim().ToUpper() != "SYSTEM") { SetInfo(parts[0].Trim(), parts[1], parts[4]); }
                                 }
                                 break;
@@ -292,6 +324,7 @@ namespace LordAshes
                                 action = ChangeAction.remove;
                                 if (data.ContainsKey(parts[0].Trim()) && data[parts[0].Trim()].ContainsKey(parts[1]))
                                 {
+                                    if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Remote Clear Request Detected"); }
                                     if (parts[0].Trim().ToUpper() != "SYSTEM") { ClearInfo(parts[0].Trim(), parts[1]); }
                                 }
                                 break;
