@@ -19,6 +19,7 @@ This plugin, like all others, is free but if you want to donate, use: http://Lor
 ## Change Log
 
 ```
+1.3.0: Added on screen diagnostics similar to those offered by Stat Messaging.
 1.2.6: Better checking for missing message distributor and legacy support. Avoids exception when not available.
 1.2.5: Improved message distribution analysis
 1.2.4: Minor bug fixes
@@ -44,7 +45,29 @@ Note: You need at least one message distribution plugin (e.g. ChatService plugin
 Currently the plugin will use the first plugin in the configured list that exists on the system. If you have multiple
 message distribution plugins, you can select the preferred plugin by re-ordering the list.
 
-## Usage
+## Runtime Usage
+
+```
+RCTRL+D = Toggle on screen diagnostics
+RCTRL+F = Display screen diagnostics for specified asset (selected by name dialog entry)
+RCTRL+G = Dump entire asset data information for the current board to the log
+```
+
+Toggling the on screen diagnostics will cause all of the asset data messages for the currently selected assed to be
+written to the top of the screen unless the currently selected asset has been overridden using the specific asset
+selection in which case the information for that asset is displayed instead.
+
+Triggering the specific asset shortcuts prompts for the identification of the desired asset. If the asset exists the
+corresponding asset data information for it will be displayed instead of the currently selected asset. To return back
+to dislaying information for the currently selected asset, use this function again and then press the Clear button.
+Asset Data allows the storage of assets which are not necessarily associated with a selected object. For example, the
+plugin can store information about the board or global user preferences. This function allows the displaying of such
+asset information by allowing the user to select it by its identity as opposed to clicking on it.
+
+The dump to log trigger allows all of the current asset data information (for the current board) to be dumped to the
+log. This allows deep analysis of all information associated with all assets on the board.
+
+## Development Usage
 
 This plugin stores information about a source using keys. A key is just a name for a piece of information and is used
 to identify that piece of information in read requests, write requests and notifications. For example, consider a green
