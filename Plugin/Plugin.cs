@@ -18,7 +18,7 @@ namespace LordAshes
         // Plugin info
         public const string Name = "Asset Data Plug-In";
         public const string Guid = "org.lordashes.plugins.assetdata";
-        public const string Version = "1.3.0.0";
+        public const string Version = "2.0.1.0";
 
         public static bool Ready = false;
 
@@ -53,35 +53,40 @@ namespace LordAshes
                 for (int asset = 0; asset < Internal.data.Keys.Count; asset++)
                 {
                     string key = Internal.data.Keys.ElementAt(asset);
-                    if (DateTime.UtcNow.Subtract(DateTime.Parse(Internal.data[key]["{Internal.Source.Timestamp}"].value)).TotalDays > Internal.cutoff)
+                    if (Internal.data[key].ContainsKey("{Internal.Source.Timestamp}"))
                     {
-                        if (Internal.diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Removing Data For Asset " + key + " (Last Access " + Internal.data[key]["{Internal.Source.Timestamp}"].value + ")"); }
-                        lock (Internal.padlockData)
+                        if (DateTime.UtcNow.Subtract(DateTime.Parse(Internal.data[key]["{Internal.Source.Timestamp}"].value)).TotalDays > Internal.cutoff)
                         {
-                            Internal.data.Remove(key);
+                            if (Internal.diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Removing Data For Asset " + key + " (Last Access " + Internal.data[key]["{Internal.Source.Timestamp}"].value + ")"); }
+                            lock (Internal.padlockData)
+                            {
+                                Internal.data.Remove(key);
+                            }
+                            asset--;
                         }
-                        asset--;
                     }
                 }
-
-                if (!Internal.data.ContainsKey(AssetDataPlugin.Guid))
-                {
-                    SetInfo(AssetDataPlugin.Guid, "ScreenDiagnostics", false.ToString());
-                    SetInfo(AssetDataPlugin.Guid, "DiagnosticsOverrideAssetName", "");
-                }
-                if (!Internal.data[AssetDataPlugin.Guid].ContainsKey("ScreenDiagnostics")) { SetInfo(AssetDataPlugin.Guid, "ScreenDiagnostics", false.ToString()); }
-                if (!Internal.data[AssetDataPlugin.Guid].ContainsKey("DiagnosticsOverrideAssetName")) { SetInfo(AssetDataPlugin.Guid, "DiagnosticsOverrideAssetName", ""); }
 
                 Internal.Reset();
             };
 
-            if (!Internal.data.ContainsKey(AssetDataPlugin.Guid))
+            if (!Internal.data.ContainsKey(AssetDataPlugin.Guid)) { Internal.data.Add(AssetDataPlugin.Guid, new Dictionary<string, Datum>()); }
+            if (!Internal.data[AssetDataPlugin.Guid].ContainsKey("ScreenDiagnostics"))
             {
-                SetInfo(AssetDataPlugin.Guid, "ScreenDiagnostics", false.ToString());
-                SetInfo(AssetDataPlugin.Guid, "DiagnosticsOverrideAssetName", "");
+                Internal.data[AssetDataPlugin.Guid].Add("ScreenDiagnostics", new Datum() { previous = false.ToString(), value = false.ToString() });
             }
-            if (!Internal.data[AssetDataPlugin.Guid].ContainsKey("ScreenDiagnostics")) { SetInfo(AssetDataPlugin.Guid, "ScreenDiagnostics", false.ToString()); }
-            if (!Internal.data[AssetDataPlugin.Guid].ContainsKey("DiagnosticsOverrideAssetName")) { SetInfo(AssetDataPlugin.Guid, "DiagnosticsOverrideAssetName", ""); }
+            else
+            {
+                Internal.data[AssetDataPlugin.Guid]["ScreenDiagnostics"] = new Datum() { previous = Internal.data[AssetDataPlugin.Guid]["ScreenDiagnostics"].value, value = false.ToString() };
+            }
+            if (!Internal.data[AssetDataPlugin.Guid].ContainsKey("DiagnosticsOverrideAssetName"))
+            {
+                Internal.data[AssetDataPlugin.Guid].Add("DiagnosticsOverrideAssetName", new Datum() { previous = "", value = "" });
+            }
+            else
+            {
+                Internal.data[AssetDataPlugin.Guid]["DiagnosticsOverrideAssetName"] = new Datum() { previous = Internal.data[AssetDataPlugin.Guid]["DiagnosticsOverrideAssetName"].value, value = "" };
+            }
 
             var harmony = new Harmony(Guid);
             harmony.PatchAll();
@@ -122,7 +127,7 @@ namespace LordAshes
                         CreaturePresenter.TryGetAsset(LocalClient.SelectedCreatureId, out asset);
                         if (asset != null)
                         {
-                            id = asset.Creature.CreatureId.ToString();
+                            id = asset.CreatureId.ToString();
                         }
                     }
                     if (id != "")

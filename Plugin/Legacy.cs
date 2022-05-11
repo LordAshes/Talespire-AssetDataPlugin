@@ -13,12 +13,7 @@ namespace LordAshes
         {
             public static string GetCreatureName(CreatureBoardAsset asset)
             {
-                return GetCreatureName(asset.Creature.Name);
-            }
-
-            public static string GetCreatureName(Creature creature)
-            {
-                return GetCreatureName(creature.Name);
+                return GetCreatureName(asset.Name);
             }
 
             public static string GetCreatureName(string name)
@@ -32,12 +27,7 @@ namespace LordAshes
 
             public static string GetStatBlock(CreatureBoardAsset asset)
             {
-                return GetStatBlock(asset.Creature.Name);
-            }
-
-            public static string GetStatBlock(Creature creature)
-            {
-                return GetStatBlock(creature.Name);
+                return GetStatBlock(asset.Name);
             }
 
             public static string GetStatBlock(string block)
