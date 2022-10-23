@@ -23,6 +23,7 @@ namespace LordAshes
             public Action<DatumChange> callback { get; set; } = null;
             public string callbackType { get; set; } = null;
             public string callbackMethod { get; set; } = null;
+            public Func<DatumChange, bool> checker { get; set; } = null;
         }
 
         /// <summary>
@@ -133,7 +134,11 @@ namespace LordAshes
 
             public static KeyboardShortcut triggerDiagnosticToggle;
             public static KeyboardShortcut triggerSpecificDiagnostic;
+            public static KeyboardShortcut triggerDiagnosticSpecificDump; 
             public static KeyboardShortcut triggerDiagnosticDump;
+            public static KeyboardShortcut triggerSimData;
+
+            public static int maxRequestAttempts = 100;
 
             public static void Reset()
             {
@@ -142,6 +147,7 @@ namespace LordAshes
                     if (Internal.diagnostics >= DiagnosticSelection.low) { Debug.Log("Asset Data Plugin: Client Requested Full Reset"); }
                     lock (Internal.padlockData)
                     {
+                        Backlog.backlog.Clear();
                         foreach (KeyValuePair<string, Dictionary<string, Datum>> source in Internal.data)
                         {
                             foreach (KeyValuePair<string, Datum> datum in source.Value)
@@ -379,7 +385,7 @@ namespace LordAshes
                         if (diagnostics >= DiagnosticSelection.low) { Debug.Log("Asset Data Plugin: Datum Changed: " + key + " on " + identity + " changing from " + previous + " to " + value); }
                         lock (padlockSubscriptions)
                         {
-                            if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Sending Out Subscription Callbacks"); }
+                            if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Queuing Callbacks"); }
                             foreach (Subscription subscription in subscriptions)
                             {
                                 Wildcard match = new Wildcard(subscription.pattern, RegexOptions.IgnoreCase);
@@ -389,50 +395,18 @@ namespace LordAshes
                                 if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Subscription: "+subscription.pattern+", Key: "+key+", Match: "+ isMatch+" (Subscription Restriction: " + subscriptionRestrictionMatch+", Pattern Restriction: "+patternRestrictionMatch+")"); }
                                 if (isMatch && subscriptionRestrictionMatch && patternRestrictionMatch)
                                 {
-                                    if (subscription.callback != null)
+                                    Backlog.Add(subscription.subscription.ToString(), new Backlog.BacklogItem()
                                     {
-                                        if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Sending Regular Callback"); }
-                                        DatumChange datum = new DatumChange() { action = action, source = identity, key = key, previous = previous, value = value };
-                                        try
+                                        request = new DatumChange()
                                         {
-                                            subscription.callback(datum);
-                                        }
-                                        catch(Exception x)
-                                        {
-                                            Debug.Log("Asset Data Plugin: Exception Sending Regular Callback");
-                                            Debug.Log(Convert.ToString(x));
-                                            Debug.LogException(x);
-                                        }
-                                    }
-                                    else if (subscription.callbackType != null && subscription.callbackMethod != null)
-                                    {
-                                        if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Sending Reflection Callback"); }
-                                        try
-                                        {
-                                            Type t = Type.GetType(subscription.callbackType);
-                                            if (t != null)
-                                            {
-                                                MethodInfo m = t.GetMethod(subscription.callbackMethod);
-                                                if (m != null)
-                                                {
-                                                    m.Invoke(null, new object[] { action.ToString(), identity, key, previous, value });
-                                                }
-                                                else
-                                                {
-                                                    Debug.LogWarning("Asset Data Plugin: Callback Method Is Not Found");
-                                                }
-                                            }
-                                            else
-                                            {
-                                                Debug.LogWarning("Asset Data Plugin: Callback Type Is Not Found");
-                                            }
-                                        }
-                                        catch(Exception x)
-                                        {
-                                            Debug.Log("Asset Data Plugin: Exception Sending Reflection Callback");
-                                            Debug.LogException(x);
-                                        }
-                                    }
+                                            action = action,
+                                            key = key,
+                                            source = identity,
+                                            previous = previous,
+                                            value = value
+                                        },
+                                        subscription = subscription
+                                    });
                                 }
                             }
                         }
@@ -602,7 +576,6 @@ namespace LordAshes
                     Internal.messageDistributor.AddHandler("/" + AssetDataPlugin.Guid, Internal.ProcessRemoteChange);
                     Internal.messageDistributor.AddHandler("/" + AssetDataPlugin.Guid + ".Multi", Internal.ProcessRemoteChange);
                     if (Internal.diagnostics >= DiagnosticSelection.low) { Debug.Log("Asset Data Plugin: Using Message Distributor " + distributor); }
-                    Ready = true;
                     break;
                 }
                 catch (Exception ex)

@@ -18,9 +18,9 @@ namespace LordAshes
         // Plugin info
         public const string Name = "Asset Data Plug-In";
         public const string Guid = "org.lordashes.plugins.assetdata";
-        public const string Version = "2.0.1.0";
+        public const string Version = "2.1.0.0";
 
-        public static bool Ready = false;
+        public bool boardLoaded = false;
 
         void Awake()
         {
@@ -32,43 +32,15 @@ namespace LordAshes
 
             Internal.triggerDiagnosticToggle = Config.Bind("Settings", "Toggle Screen Diagnostics", new KeyboardShortcut(KeyCode.D, KeyCode.RightControl)).Value;
             Internal.triggerSpecificDiagnostic = Config.Bind("Settings", "Show Diagnostics For Asset By Name", new KeyboardShortcut(KeyCode.F, KeyCode.RightControl)).Value;
-            Internal.triggerDiagnosticDump = Config.Bind("Settings", "Dump Complete Asset Data", new KeyboardShortcut(KeyCode.G, KeyCode.RightControl)).Value;
+            Internal.triggerDiagnosticSpecificDump = Config.Bind("Settings", "Log Selected Asset Data", new KeyboardShortcut(KeyCode.G, KeyCode.RightControl)).Value;
+            Internal.triggerDiagnosticDump = Config.Bind("Settings", "Log Complete Asset Data", new KeyboardShortcut(KeyCode.G, KeyCode.RightAlt)).Value;
+            Internal.triggerSimData = Config.Bind("Settings", "Simulate Data", new KeyboardShortcut(KeyCode.G, KeyCode.RightShift)).Value;
+
+            Internal.maxRequestAttempts = Config.Bind("Settings", "Maximum Request Attempts", 100).Value;
 
             StartCoroutine("GetDistributor", new object[] { Config.Bind("Settings", "Plugins load time", 3f).Value });
 
             if(!System.IO.Directory.Exists(Internal.pluginPath + "AssetData")) { System.IO.Directory.CreateDirectory(Internal.pluginPath + "AssetData/"); }
-
-            CampaignSessionManager.OnCampaignChanged += () =>
-            {
-                if (Internal.diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Campaign Changed"); }
-                if (System.IO.File.Exists(Internal.pluginPath + "AssetData/AssetDataPlugin." + CampaignSessionManager.Info.Description + "(" + CampaignSessionManager.Id.ToString() + ").json"))
-                {
-                    if (Internal.diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Previous Data Found. Loading AssetDataPlugin Data..."); }
-                    lock (Internal.padlockData)
-                    {
-                        Internal.data = JsonConvert.DeserializeObject<Dictionary<string, Dictionary<string, Datum>>>(System.IO.File.ReadAllText(Internal.pluginPath + "AssetData/AssetDataPlugin." + CampaignSessionManager.Info.Description + "(" + CampaignSessionManager.Id.ToString() + ").json"));
-                    }
-                }
-
-                for (int asset = 0; asset < Internal.data.Keys.Count; asset++)
-                {
-                    string key = Internal.data.Keys.ElementAt(asset);
-                    if (Internal.data[key].ContainsKey("{Internal.Source.Timestamp}"))
-                    {
-                        if (DateTime.UtcNow.Subtract(DateTime.Parse(Internal.data[key]["{Internal.Source.Timestamp}"].value)).TotalDays > Internal.cutoff)
-                        {
-                            if (Internal.diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Removing Data For Asset " + key + " (Last Access " + Internal.data[key]["{Internal.Source.Timestamp}"].value + ")"); }
-                            lock (Internal.padlockData)
-                            {
-                                Internal.data.Remove(key);
-                            }
-                            asset--;
-                        }
-                    }
-                }
-
-                Internal.Reset();
-            };
 
             if (!Internal.data.ContainsKey(AssetDataPlugin.Guid)) { Internal.data.Add(AssetDataPlugin.Guid, new Dictionary<string, Datum>()); }
             if (!Internal.data[AssetDataPlugin.Guid].ContainsKey("ScreenDiagnostics"))
@@ -91,14 +63,19 @@ namespace LordAshes
             var harmony = new Harmony(Guid);
             harmony.PatchAll();
 
-            StartCoroutine("CheckForLegacySupport");
+            StartCoroutine(CheckForLegacySupport());
+
+            StartCoroutine(BacklogLoop());
 
             Utility.PostOnMainPage(this.GetType());
         }
 
         void Update()
         {
-            if(Utility.StrictKeyCheck(Internal.triggerDiagnosticToggle))
+            if(!boardLoaded && Utility.isBoardLoaded()) { boardLoaded = true; OnCampaignChange(); }
+            else if (boardLoaded && !Utility.isBoardLoaded()) { boardLoaded = false; }
+
+            if (Utility.StrictKeyCheck(Internal.triggerDiagnosticToggle))
             {
                 SetInfo(AssetDataPlugin.Guid, "ScreenDiagnostics", (!bool.Parse(Internal.data[AssetDataPlugin.Guid]["ScreenDiagnostics"].value)).ToString());
             }
@@ -108,9 +85,32 @@ namespace LordAshes
                                               "Apply", (name) => { SetInfo(AssetDataPlugin.Guid, "DiagnosticsOverrideAssetName", name); SetInfo(AssetDataPlugin.Guid, "ScreenDiagnostics", true.ToString()); }, null,
                                               "Clear", () => { SetInfo(AssetDataPlugin.Guid, "DiagnosticsOverrideAssetName", ""); }, "");
             }
+            else if (Utility.StrictKeyCheck(Internal.triggerDiagnosticSpecificDump))
+            {
+                Debug.Log("Asset Data Plugin:\r\n" + JsonConvert.SerializeObject(Internal.data[LocalClient.SelectedCreatureId.ToString()]));
+            }
             else if (Utility.StrictKeyCheck(Internal.triggerDiagnosticDump))
             {
                 Debug.Log("Asset Data Plugin:\r\n" + JsonConvert.SerializeObject(Internal.data));
+            }
+            else if (Utility.StrictKeyCheck(Internal.triggerSimData))
+            {
+                SystemMessage.AskForTextInput("Data Simulation...", "Enter Source:",
+                                              "Apply", (source) => 
+                {
+                    SystemMessage.AskForTextInput("Diagnostics For Asset...", "Enter Key:",
+                                                  "Apply", (key) =>
+                    {
+                        SystemMessage.AskForTextInput("Diagnostics For Asset...", "Enter Value:",
+                                                                                  "Apply", (value) =>
+                        {
+                            AssetDataPlugin.SetInfo(source, key, value);
+                        }, null,
+                        "Clear", null, "");
+                    }, null,
+                    "Clear", null, "");
+                }, null,
+                "Clear", null, "");
             }
         }
 
@@ -148,7 +148,6 @@ namespace LordAshes
             }
         }
 
-
         /// <summary>
         /// Subscription for notification when the given key (or key pattern) changes for any asset
         /// </summary>
@@ -161,7 +160,19 @@ namespace LordAshes
             System.Guid identity = System.Guid.NewGuid();
             lock (Internal.padlockSubscriptions)
             {
-                Internal.subscriptions.Add(new Subscription() { subscription = identity, pattern = pattern, callback = callback, callbackType = null, callbackMethod = null });
+                Internal.subscriptions.Add(new Subscription() { subscription = identity, pattern = pattern, callback = callback, callbackType = null, callbackMethod = null, checker = null });
+                Reset(identity);
+            }
+            return identity;
+        }
+
+        public static System.Guid Subscribe(string pattern, Action<DatumChange> callback, Func<DatumChange,bool> checker)
+        {
+            if (Internal.diagnostics >= DiagnosticSelection.low) { Debug.Log("Asset Data Plugin: Client Subscribed To " + pattern); }
+            System.Guid identity = System.Guid.NewGuid();
+            lock (Internal.padlockSubscriptions)
+            {
+                Internal.subscriptions.Add(new Subscription() { subscription = identity, pattern = pattern, callback = callback, callbackType = null, callbackMethod = null, checker = checker });
                 Reset(identity);
             }
             return identity;
@@ -446,6 +457,54 @@ namespace LordAshes
             yield return new WaitForSeconds(3.0f);
             Debug.Log("Asset Data Plugin: Checking For Legacy Support");
             Legacy.SubscribeToLegacyMessages();
+        }
+
+        /// <summary>
+        /// Backlog coroutine to releave stress from having backlog processed each Update cycle
+        /// </summary>
+        /// <returns></returns>
+        public IEnumerator BacklogLoop()
+        {
+            while (true)
+            {
+                yield return new WaitForSeconds(0.25f);
+                Backlog.Process();
+            }
+        }
+
+        /// <summary>
+        /// Campaign change method handler
+        /// </summary>
+        public void OnCampaignChange()
+        {
+            if (Internal.diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Campaign Changed"); }
+            if (System.IO.File.Exists(Internal.pluginPath + "AssetData/AssetDataPlugin." + CampaignSessionManager.Info.Description + "(" + CampaignSessionManager.Id.ToString() + ").json"))
+            {
+                if (Internal.diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Previous Data Found. Loading AssetDataPlugin Data..."); }
+                lock (Internal.padlockData)
+                {
+                    Internal.data = JsonConvert.DeserializeObject<Dictionary<string, Dictionary<string, Datum>>>(System.IO.File.ReadAllText(Internal.pluginPath + "AssetData/AssetDataPlugin." + CampaignSessionManager.Info.Description + "(" + CampaignSessionManager.Id.ToString() + ").json"));
+                }
+            }
+
+            for (int asset = 0; asset < Internal.data.Keys.Count; asset++)
+            {
+                string key = Internal.data.Keys.ElementAt(asset);
+                if (Internal.data[key].ContainsKey("{Internal.Source.Timestamp}"))
+                {
+                    if (DateTime.UtcNow.Subtract(DateTime.Parse(Internal.data[key]["{Internal.Source.Timestamp}"].value)).TotalDays > Internal.cutoff)
+                    {
+                        if (Internal.diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Removing Data For Asset " + key + " (Last Access " + Internal.data[key]["{Internal.Source.Timestamp}"].value + ")"); }
+                        lock (Internal.padlockData)
+                        {
+                            Internal.data.Remove(key);
+                        }
+                        asset--;
+                    }
+                }
+            }
+
+            Internal.Reset();
         }
     }
 }

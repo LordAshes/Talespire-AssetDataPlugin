@@ -81,10 +81,6 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>D:\Steam\steamapps\common\TaleSpire\TaleSpire_Data\Managed\Unity.Mathematics.dll</HintPath>
     </Reference>
-    <Reference Include="Unity.Physics, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>D:\Steam\steamapps\common\TaleSpire\TaleSpire_Data\Managed\Unity.Physics.dll</HintPath>
-    </Reference>
     <Reference Include="Unity.Postprocessing.Runtime, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>D:\Steam\steamapps\common\TaleSpire\TaleSpire_Data\Managed\Unity.Postprocessing.Runtime.dll</HintPath>
@@ -112,6 +108,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Backlog.cs" />
     <Compile Include="Internal.cs" />
     <Compile Include="Legacy.cs" />
     <Compile Include="Patches\Patches.cs" />
