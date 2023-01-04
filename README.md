@@ -19,7 +19,15 @@ This plugin, like all others, is free but if you want to donate, use: http://Lor
 ## Change Log
 
 ```
-2.0.0: Fix after BR HF Integration update
+2.1.3: Bug Fix: Sending short messages received corrupted data
+2.1.2: Bug Fix: HF assets were not loading
+2.1.1: Bug Fix: Data change previous value now has value when distributed
+2.1.1: Bug Fix: Campaign change no longer causes an exception
+2.1.1: Bug Fix: Checker for Source And Value fixed to support value@time format
+2.1.0: Added backlog buffer implementation
+2.1.0: Creature remove cleans up related messages
+2.0.1: Bug fix on startup which prevents a SetInfo exception
+2.0.0: Fix after BR HF Integration Update
 1.3.0: Added on screen diagnostics similar to those offered by Stat Messaging.
 1.2.6: Better checking for missing message distributor and legacy support. Avoids exception when not available.
 1.2.5: Improved message distribution analysis
@@ -51,7 +59,9 @@ message distribution plugins, you can select the preferred plugin by re-ordering
 ```
 RCTRL+D = Toggle on screen diagnostics
 RCTRL+F = Display screen diagnostics for specified asset (selected by name dialog entry)
-RCTRL+G = Dump entire asset data information for the current board to the log
+RCTRL+G = Dump selected mini asset data information to the log
+RALT+G = Dump entire asset data for the board to the log
+RSHIFT+G = Simulate Data
 ```
 
 Toggling the on screen diagnostics will cause all of the asset data messages for the currently selected assed to be
@@ -78,6 +88,7 @@ both the source (asset), in this case the ball, and the piece of information (ke
 
 ```
 Subscribe(*key*, *callback*);
+Subscribe(*key*, *callback*, *checker*);
 ```
 
 This is a static method so you don't need to initialize any class to do it. This method triggers the specified callback
@@ -95,6 +106,22 @@ Wildcards:
 
 ``*`` = Any number of characters including none.
 ``?`` = Any one character
+
+The _checker_ parameter is optional. If not specified a _checker_ is not used. If a checker is provided, each data change
+is queued until the data change passes the checker evaluation. Typically this is used to ensure that an asset has fully
+loaded before processing the data change. While it is possible to use custom checkers, two commonly needed checkers have
+been provided: 
+
+``AssetDataPlugin.Backlog.Checker.CheckSourceAsCreature``
+``AssetDataPlugin.Backlog.Checker.CheckSourceAndValueAsCreature``
+
+The first checker verifies that the source of the data change is a valid Creature Guid and that the corresponding asset's
+base and body has loaded. This is the most commonly used checker to esnure that assets have loaded before plugin functionality
+is applied to them (e.g. notes, states, icons, lights, etc). The second checker verfies both the source and the value assuming
+that the value is a Creature Guid or a Creature Guid with a timsestamp appended separated by an at sign (@).
+
+Using a checker means that the plugin can assume all assets have fully loaded by the time the data change notification is
+received and thus don't need to implement a backlog queue of their own.
 
 
 ```
@@ -206,3 +233,32 @@ same a the regular subscription method except the instead of passing in the call
 the name of the callback (static) type and the name of the callback (static) method. This allows this method to be used
 with reflection when trying to implement soft dependency on Asset Data plugin.  
 
+## Backlog Queue
+
+The backlog queue is transparent to the use of the Asset Data Plugin. Instead of data change notifications being sent out
+right away (like they were in previous versions). Data change notifications are placed in a backlog queue based on the
+subscription. Items in the queue are periodically processed which results in the actual notification. However, this allows
+the processing of the queue to implement a checker. If the subscription has not provided a checker then the data change
+sends out a data change notification (same as in previous versions). If a checker is provided during the subscription
+(either a custom one or one of the provided ones) then the data change is passed to the checker and a notification is sent
+out only if the checker returns true. If the checker returns false then the data change is placed on the back of the queue
+after having its failure count increased by one. If the failures exceeds the configured number of attemps then the item is,
+instead, removed from the queue.
+
+This implementation resolves the common issue of plugins performing actions on assets during board load but the assets not
+being loaded yet. This normally means that the plugin either needs to detect this condition and delay processing of its
+requests or needs to have some sort of a delay and re-try key combination. The Asset Data Plugin solves this by not only
+implementing that backlog to queue data changes until the assets are ready but it does it in a transparent way to the plugin
+using it so that the plugin can just assume that the assets are ready when the data change notification is received.
+This make the code of the plugin much easier because the plugin does not need to have any code related to checking that
+the asset is available (beyond the specification of a checker in the subscribe).
+
+## Invalid Request
+
+It is possible that a board can have invalid data change messages. For example, when minis are removed from a board in an
+unexpected way, the board no longer contains the mini but the Asset Data Plugin may still have information for it. This means
+on board load it will try to process that information but there is no corresponding mini for the request to be processed on.
+To address this, the Asset Data Plugin has a max attempt count. When it gets a data change request, it will attempt to process
+it up to a number of times equal to the max attempts. If it succeeds before that number of attempts then nothing else is done.
+If it fails on all those attempts then the request is dropped from the backlog. This ensures that the Asset Data Plugin does not
+continue to try to process these the whole session dramatically increasing CPU usage.
