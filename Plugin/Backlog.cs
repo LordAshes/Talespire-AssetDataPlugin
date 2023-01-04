@@ -1,4 +1,5 @@
 ﻿using BepInEx;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -90,7 +91,16 @@ namespace LordAshes
                         else
                         {
                             if (Internal.diagnostics >= DiagnosticSelection.debug) { Debug.Log("Asset Data Plugin: Check Failed Final Attempt. Removing..."); }
-                            try { AssetDataPlugin.ClearInfo(item.request.source, item.request.key); } catch { ; }
+                            // Remove entry from Asset Data so that it is not present of future loads
+                            if (Internal.data.ContainsKey(item.request.source))
+                            {
+                                Internal.data[item.request.source].Remove(item.request.key);
+                                if(Internal.data[item.request.source].Count==0)
+                                {
+                                    Internal.data.Remove(item.request.source);
+                                }
+                                System.IO.File.WriteAllText(Internal.pluginPath + "AssetData/AssetDataPlugin." + CampaignSessionManager.Info.Description + "(" + CampaignSessionManager.Id.ToString() + ").json", JsonConvert.SerializeObject(Internal.data, Formatting.Indented));
+                            }
                         }
                     }
                 }
@@ -156,7 +166,7 @@ namespace LordAshes
             {
                 public static bool CheckSourceAsCreature(AssetDataPlugin.DatumChange datum)
                 {
-                    if (Internal.diagnostics >= DiagnosticSelection.debug) { Debug.Log("Asset Data Plugin: Source Creature Loaded Check"); }
+                    if (Internal.diagnostics >= DiagnosticSelection.debug) { Debug.Log("Asset Data Plugin: Source Creature ("+datum.source+") Loaded Check"); }
                     // Test that source is a valid creature id
                     CreatureGuid cid = CreatureGuid.Empty;
                     if(CreatureGuid.TryParse(datum.source, out cid))
@@ -187,7 +197,8 @@ namespace LordAshes
 
                 public static bool CheckSourceAndValueAsCreature(AssetDataPlugin.DatumChange datum)
                 {
-                    if (Internal.diagnostics >= DiagnosticSelection.debug) { Debug.Log("Asset Data Plugin: Source And Value Creature Loaded Check"); }
+                    string adjustedValue = (datum.value + "@").Substring(0, (datum.value + "@").IndexOf("@"));
+                    if (Internal.diagnostics >= DiagnosticSelection.debug) { Debug.Log("Asset Data Plugin: Source ("+datum.source+") And Value ("+adjustedValue+") Creature Loaded Check"); }
                     // Test that source is a valid creature id
                     CreatureGuid cid = CreatureGuid.Empty;
                     if (CreatureGuid.TryParse(datum.source, out cid))
@@ -213,7 +224,7 @@ namespace LordAshes
                         return false;
                     }
                     // Test that value is a valid creature id
-                    if (CreatureGuid.TryParse((datum.value+"@").Substring(0, (datum.value + "@").LastIndexOf("@")), out cid))
+                    if (CreatureGuid.TryParse(adjustedValue, out cid))
                     {
                         // Test that creature has a loaded base
                         GameObject assetBase = Utility.GetBaseLoader(cid);

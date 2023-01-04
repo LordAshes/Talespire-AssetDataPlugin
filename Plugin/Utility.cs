@@ -66,10 +66,6 @@ namespace LordAshes
                     CreaturePresenter.TryGetAsset(cid, out asset);
                     if (asset != null)
                     {
-                        /*
-                        Transform _base = null;
-                        StartWith(asset, "_base", ref _base);
-                        */
                         Transform baseLoader = null;
                         Traverse(asset.transform, "BaseLoader", 0, 10, ref baseLoader);
                         if (baseLoader != null)
@@ -104,10 +100,6 @@ namespace LordAshes
                     CreaturePresenter.TryGetAsset(cid, out asset);
                     if (asset != null)
                     {
-                        /*
-                        Transform _creatureRoot = null;
-                        StartWith(asset, "_creatureRoot", ref _creatureRoot);
-                        */
                         Transform assetLoader = null;
                         Traverse(asset.transform, "AssetLoader", 0, 10, ref assetLoader);
                         if (assetLoader != null)
@@ -126,23 +118,6 @@ namespace LordAshes
                 catch
                 {
                     return null;
-                }
-            }
-
-            public static void StartWith(CreatureBoardAsset asset, string seek, ref Transform match)
-            {
-                try
-                {
-                    Type type = typeof(CreatureBoardAsset);
-                    match = null;
-                    foreach (FieldInfo fi in type.GetRuntimeFields())
-                    {
-                        if (fi.Name == seek) { match = (Transform)fi.GetValue(asset); break; }
-                    }
-                }
-                catch
-                {
-                    match = null;
                 }
             }
 

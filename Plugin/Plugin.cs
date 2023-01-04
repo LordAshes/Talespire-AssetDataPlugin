@@ -18,7 +18,7 @@ namespace LordAshes
         // Plugin info
         public const string Name = "Asset Data Plug-In";
         public const string Guid = "org.lordashes.plugins.assetdata";
-        public const string Version = "2.1.0.0";
+        public const string Version = "2.1.3.0";
 
         public bool boardLoaded = false;
 
@@ -477,7 +477,10 @@ namespace LordAshes
         /// </summary>
         public void OnCampaignChange()
         {
-            if (Internal.diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Campaign Changed"); }
+            if (Internal.diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Campaign Changed To "+ CampaignSessionManager.Instance.CurrentState.Name); }
+
+            if (CampaignSessionManager.Instance.CurrentState.Name != "InCampaignInBuildScene") { return; }
+
             if (System.IO.File.Exists(Internal.pluginPath + "AssetData/AssetDataPlugin." + CampaignSessionManager.Info.Description + "(" + CampaignSessionManager.Id.ToString() + ").json"))
             {
                 if (Internal.diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Previous Data Found. Loading AssetDataPlugin Data..."); }

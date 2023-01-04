@@ -12,6 +12,11 @@ namespace LordAshes
     {
         public static class Patches
         {
+            /*
+             * This patch causes HF asset to not load. It has been replaced by
+             * a check in the Update() cycle to determine when boards are loaded
+             * and unload.
+             * 
             [HarmonyPatch(typeof(CampaignSessionManager), "FetchCampaignSettings")]
             public static class Patche01
             {
@@ -26,6 +31,7 @@ namespace LordAshes
                     rasieEvent?.Invoke();
                 }
             }
+            */
 
             [HarmonyPatch(typeof(CreatureBoardAsset), "RequestDelete")]
             public static class Patche02

@@ -403,10 +403,10 @@ namespace LordAshes
                                             key = key,
                                             source = identity,
                                             previous = previous,
-                                            value = value
+                                            value = ((action!=ChangeAction.remove) ? value : identity)
                                         },
                                         subscription = subscription
-                                    });
+                                    });;
                                 }
                             }
                         }
@@ -421,18 +421,28 @@ namespace LordAshes
 
             public static void SendPackets(string identity, string key, string action, string value, bool legacy = false)
             {
-                if(diagnostics >= DiagnosticSelection.debug)
+                string prev = "";
+                if (Internal.data.ContainsKey(identity))
+                {
+                    if (Internal.data[identity].ContainsKey(key))
+                    {
+                        prev = Internal.data[identity][key].value;
+                    }
+                }
+
+                if (diagnostics >= DiagnosticSelection.debug)
                 {
                     Debug.Log("Asset Data Plugin: SendPackets: identity=" + identity);
                     Debug.Log("Asset Data Plugin: SendPackets: key=" + key);
                     Debug.Log("Asset Data Plugin: SendPackets: action=" + Convert.ToString(action));
+                    Debug.Log("Asset Data Plugin: SendPackets: previois=" + prev);
                     Debug.Log("Asset Data Plugin: SendPackets: value=" + value);
                     Debug.Log("Asset Data Plugin: SendPackets: legacy=" + legacy);
                 }
                 if (!legacy)
                 {
                     if (diagnostics >= DiagnosticSelection.debug) { Debug.Log("Asset Data Plugin: SendPackets: Asset Data Send Mode"); }
-                    string msg = value;
+                    string msg = identity.ToString() + dividor + key + dividor + action + dividor + prev + dividor + value;
                     if (msg.Length > 100)
                     {
                         float packets = ((float)msg.Length / 100f);
@@ -443,19 +453,21 @@ namespace LordAshes
                         System.Guid id = System.Guid.NewGuid();
                         for (int i = 0; i < packets; i++)
                         {
+                            /*
                             if (i == 0)
                             {
                                 if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Sending Change To Other Clients (Initial Packet " + (i+1) + " of " + packets + ": " + msg.Substring(0, 100)+")"); }
-                                messageDistributor.SendMessage("/" + AssetDataPlugin.Guid + ".Multi " + id.ToString() + ":" + i + ":" + packets + " " + identity.ToString() + dividor + key + dividor + action + dividor + dividor + msg.Substring(0, 100), LocalPlayer.Id.Value);
+                                messageDistributor.SendMessage("/" + AssetDataPlugin.Guid + ".Multi " + id.ToString() + ":" + i + ":" + packets + " " + identity.ToString() + dividor + key + dividor + action + dividor + prev + dividor + msg.Substring(0, 100), LocalPlayer.Id.Value);
                             }
-                            else if (msg.Length >= 100)
+                            else*/ 
+                            if (msg.Length >= 100)
                             {
                                 if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Sending Change To Other Clients (Packet " + (i+1) + " of " + packets + ": " + msg.Substring(0, 100)+")"); }
                                 messageDistributor.SendMessage("/" + AssetDataPlugin.Guid + ".Multi " + id.ToString() + ":" + i + ":" + packets + " " + msg.Substring(0, 100), LocalPlayer.Id.Value);
                             }
                             else
                             {
-                                if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Sending Change To Other Clients (End Packet " + (i+1) + " of " + packets + ": " + msg+")"); }
+                                if (diagnostics >= DiagnosticSelection.high) { Debug.Log("Asset Data Plugin: Sending Change To Other Clients (Packet " + (i+1) + " of " + packets + ": " + msg+")"); }
                                 messageDistributor.SendMessage("/" + AssetDataPlugin.Guid + ".Multi " + id.ToString() + ":" + i + ":" + packets + " " + msg, LocalPlayer.Id.Value);
                             }
                             if (msg.Length >= 100) { msg = msg.Substring(100); } else { msg = ""; }
@@ -468,7 +480,7 @@ namespace LordAshes
                         {
                             try
                             {
-                                messageDistributor.SendMessage("/" + AssetDataPlugin.Guid + " " + identity.ToString() + dividor + key + dividor + action + dividor + dividor + msg, LocalPlayer.Id.Value);
+                                messageDistributor.SendMessage("/" + AssetDataPlugin.Guid + " " + msg, LocalPlayer.Id.Value);
                             }
                             catch(Exception x)
                             {
